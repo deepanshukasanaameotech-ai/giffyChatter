@@ -14,23 +14,24 @@ import {
 import { auth, db } from "../firebaseConfig";
 
 // MessageList Component
-const MessageList = ({ messages, currentUserId }) => {
+const MessageList = ({ messages, currentUserId, userInteracted }) => {
   const messagesEndRef = useRef(null);
 
   // Scroll to bottom whenever messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  // Scroll instantly to the latest message on page load
+  messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+}, [messages]);
 
   // Play sound for incoming messages
   useEffect(() => {
-    if (messages.length > 0) {
+    if (userInteracted && messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage.senderId !== currentUserId) {
-        playSound("/sounds/receive.mp3");
+        playSound("./sounds/receive.mp3");
       }
     }
-  }, [messages, currentUserId]);
+  }, [messages, currentUserId, userInteracted]);
 
   // Delete message
   const deleteMessage = async (messageId) => {
@@ -58,7 +59,9 @@ const MessageList = ({ messages, currentUserId }) => {
               className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
             >
               <div
-                className={`max-w-xs flex flex-col ${isOwn ? "items-end" : "items-start"} relative`}
+                className={`max-w-xs flex flex-col ${
+                  isOwn ? "items-end" : "items-start"
+                } relative`}
               >
                 <span
                   className={`text-xs font-medium mb-1 ${
@@ -71,7 +74,7 @@ const MessageList = ({ messages, currentUserId }) => {
                 <img
                   src={msg.gifUrl}
                   alt="GIF"
-                  className="rounded-lg shadow-md max-w-full h-auto object-cover"
+                  className="rounded-lg max-w-[180px] max-h-[180px] object-cover"
                 />
 
                 {isOwn && (
@@ -105,7 +108,19 @@ const ChatPage = ({ user, onSignOut }) => {
   const [gifs, setGifs] = useState([]);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [userInteracted, setUserInteracted] = useState(false);
   const TENOR_API_KEY = "AIzaSyAmheJsU5I7uaTFn0DOoVUklS__jxef0Fc";
+
+  // Track user interaction
+  useEffect(() => {
+    const handleInteraction = () => setUserInteracted(true);
+    window.addEventListener("click", handleInteraction);
+    window.addEventListener("keydown", handleInteraction);
+    return () => {
+      window.removeEventListener("click", handleInteraction);
+      window.removeEventListener("keydown", handleInteraction);
+    };
+  }, []);
 
   // Firestore listener
   useEffect(() => {
@@ -147,7 +162,7 @@ const ChatPage = ({ user, onSignOut }) => {
       timestamp: serverTimestamp(),
     });
 
-    playSound("/sounds/send.mp3");
+    if (userInteracted) playSound("./sounds/send.mp3");
     setSearchQuery("");
     setGifs([]);
   };
@@ -178,7 +193,11 @@ const ChatPage = ({ user, onSignOut }) => {
       </div>
 
       {/* Messages */}
-      <MessageList messages={messages} currentUserId={user.uid} />
+      <MessageList
+        messages={messages}
+        currentUserId={user.uid}
+        userInteracted={userInteracted}
+      />
 
       {/* GIF Selection */}
       {gifs.length > 0 && (
